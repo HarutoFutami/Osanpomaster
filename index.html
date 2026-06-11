@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>お散歩ルートプランナー - 軽量駅データでお散歩ルート自動生成</title>
+    <meta name="description" content="駅データからお散歩ルート（始点駅〜終点駅）を自動生成するWebアプリケーション。直線距離や都道府県・市区町村の条件を指定して徒歩ルートをプランニング。">
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts for soft rounded font rendering -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons for premium visual badges -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="app-logo">
+                <i data-lucide="footprints"></i>
+                <h1>お散歩ルートプランナー</h1>
+            </div>
+            <p class="subtitle">駅データからお散歩に最適なルートを自動生成します</p>
+        </header>
+
+        <!-- Main Card Container -->
+        <main class="card">
+            <!-- Loading Indicator Inside Card for Smooth Blurring -->
+            <div id="loading-overlay" class="loading-overlay">
+                <div class="spinner"></div>
+                <div class="loading-text">ルートを自動生成中...</div>
+            </div>
+
+            <!-- Panel 1: Conditions Setup Screen -->
+            <div id="panel-setup" class="panel active">
+                <!-- Area Selector Section -->
+                <section class="setup-section">
+                    <h2 class="section-title">
+                        <i data-lucide="map-pin"></i>
+                        <span>お散歩エリアを選択</span>
+                    </h2>
+                    
+                    <div class="area-utility-row">
+                        <button type="button" id="btn-select-all" class="btn-utility">すべて選択</button>
+                        <button type="button" id="btn-deselect-all" class="btn-utility">すべて解除</button>
+                    </div>
+                    
+                    <div id="area-selector" class="area-selector-container">
+                        <!-- Dynamically populated checkbox tree -->
+                        <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                            データを読み込んでいます...
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Distance Selector Section -->
+                <section class="setup-section">
+                    <h2 class="section-title">
+                        <i data-lucide="route"></i>
+                        <span>お散歩距離を選択</span>
+                    </h2>
+                    
+                    <div class="distance-selector-grid">
+                        <button type="button" class="distance-option selected" data-mode="quick" data-min="2" data-max="3">
+                            <div class="distance-title">サクッと</div>
+                            <div class="distance-desc">2 〜 3 km</div>
+                        </button>
+                        <button type="button" class="distance-option" data-mode="quick" data-min="3" data-max="6">
+                            <div class="distance-title">しっかり</div>
+                            <div class="distance-desc">3 〜 6 km</div>
+                        </button>
+                        <button type="button" class="distance-option" data-mode="quick" data-min="6" data-max="10">
+                            <div class="distance-title">がっつり</div>
+                            <div class="distance-desc">6 〜 10 km</div>
+                        </button>
+                        <button type="button" class="distance-option" data-mode="custom">
+                            <div class="distance-title">カスタム</div>
+                            <div class="distance-desc">距離を自由に入力</div>
+                        </button>
+                    </div>
+
+                    <!-- Custom Distance Inputs -->
+                    <div id="custom-distance-container" class="custom-distance-container">
+                        <div class="input-number-wrapper">
+                            <input type="number" id="min-distance" value="2.0" min="0.1" max="50.0" step="0.5">
+                        </div>
+                        <span>km</span>
+                        <span>〜</span>
+                        <div class="input-number-wrapper">
+                            <input type="number" id="max-distance" value="5.0" min="0.1" max="50.0" step="0.5">
+                        </div>
+                        <span>km</span>
+                    </div>
+                </section>
+
+                <!-- Setup Screen Error Display -->
+                <div id="setup-error" class="error-message"></div>
+
+                <!-- Generate Trigger Button -->
+                <button type="button" id="btn-generate" class="btn-primary" disabled>
+                    <i data-lucide="compass"></i>
+                    <span>ルートを生成する</span>
+                </button>
+            </div>
+
+            <!-- Panel 2: Result Display Screen -->
+            <div id="panel-result" class="panel">
+                <div class="result-card">
+                    <div class="result-header">
+                        <span class="route-badge">WALK PLAN</span>
+                        <h3>おすすめのお散歩ルート</h3>
+                    </div>
+
+                    <!-- Visual Route Map Representation -->
+                    <div class="route-display">
+                        <!-- Start Node -->
+                        <div class="station-node">
+                            <div class="node-role start">START (始点)</div>
+                            <div id="start-station-name" class="station-name">蒲田</div>
+                            <div id="start-station-lines" class="line-list">
+                                <span class="line-badge">JR京浜東北線</span>
+                                <span class="line-badge">東急池上線</span>
+                            </div>
+                        </div>
+
+                        <!-- Spacer Arrow -->
+                        <div class="route-arrow">
+                            <i data-lucide="arrow-down"></i>
+                        </div>
+
+                        <!-- End Node -->
+                        <div class="station-node">
+                            <div class="node-role end">GOAL (終点)</div>
+                            <div id="end-station-name" class="station-name">羽田空港第１・第２ターミナル</div>
+                            <div id="end-station-lines" class="line-list">
+                                <span class="line-badge">京急空港線</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Distance Number Box -->
+                    <div class="distance-display">
+                        <div class="distance-label">直線距離</div>
+                        <div>
+                            <span id="route-distance" class="distance-number">4.52</span>
+                            <span style="font-size: 1.1rem; font-weight: 600; color: #10b981; margin-left: 2px;">km</span>
+                        </div>
+                    </div>
+
+                    <!-- Result Screen Error Display (for reroll failsafe) -->
+                    <div id="result-error" class="error-message"></div>
+
+                    <!-- Action Buttons -->
+                    <div class="actions-container">
+                        <button type="button" id="btn-google-map" class="btn-secondary btn-map">
+                            <i data-lucide="navigation"></i>
+                            <span>Googleマップで徒歩ルートを見る</span>
+                        </button>
+                        
+                        <div class="button-row">
+                            <button type="button" id="btn-reroll" class="btn-secondary">
+                                <i data-lucide="refresh-cw"></i>
+                                <span>もう一度選ぶ (再抽選)</span>
+                            </button>
+                            <button type="button" id="btn-back" class="btn-secondary">
+                                <i data-lucide="sliders"></i>
+                                <span>条件を変える</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- App Logic Script -->
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
