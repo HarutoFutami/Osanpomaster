@@ -4,6 +4,16 @@
 let stationsData = [];
 let selectedDistanceRange = { min: 2, max: 3 }; // Default "サクッと" (2-3km)
 let currentRoute = null;
+let displayToOriginalMap = new Map(); // Map to store {pref}_{displayCity} -> Set(originalCities)
+
+// Helper to determine display city name (integrates designated cities like "横浜市港北区" -> "横浜市")
+function getDisplayCity(city) {
+    const m = city.match(/^([^市]+?市)(.+?区)$/);
+    if (m) {
+        return m[1]; // returns "〇〇市"
+    }
+    return city;
+}
 
 // Region to Prefecture mapping (North to South order)
 const REGION_MAP = {
@@ -73,17 +83,21 @@ async function initApp() {
 
 // Build hierarchical 3-Tier check list (Region -> Prefecture -> City)
 function build3TierAreaTree() {
-    // 1. Group cities by pref, then by region
+    displayToOriginalMap.clear();
+    
+    // 1. Group display cities by pref, then by region
     // Structure: regionMapData = { "関東": { "東京都": Set("大田区", "新宿区", ...), ... } }
     const regionMapData = {};
     
     stationsData.forEach(station => {
         const pref = station.pref;
-        const city = station.city;
-        if (!pref || !city) return;
+        const originalCity = station.city;
+        if (!pref || !originalCity) return;
         
         const region = PREF_TO_REGION[pref];
         if (!region) return; // Skip if prefecture is not registered in map
+        
+        const displayCity = getDisplayCity(originalCity);
         
         if (!regionMapData[region]) {
             regionMapData[region] = {};
@@ -91,7 +105,14 @@ function build3TierAreaTree() {
         if (!regionMapData[region][pref]) {
             regionMapData[region][pref] = new Set();
         }
-        regionMapData[region][pref].add(city);
+        regionMapData[region][pref].add(displayCity);
+        
+        // Map displayCity to original cities under this prefecture
+        const key = `${pref}_${displayCity}`;
+        if (!displayToOriginalMap.has(key)) {
+            displayToOriginalMap.set(key, new Set());
+        }
+        displayToOriginalMap.get(key).add(originalCity);
     });
 
     areaSelector.innerHTML = '';
@@ -492,7 +513,13 @@ function pickRoute() {
 
     // Filter stations in selected cities
     const filteredStations = stationsData.filter(station => {
-        return selectedCities.some(sc => sc.pref === station.pref && sc.city === station.city);
+        return selectedCities.some(sc => {
+            if (sc.pref !== station.pref) return false;
+            
+            const key = `${sc.pref}_${sc.city}`;
+            const originalCities = displayToOriginalMap.get(key);
+            return originalCities && originalCities.has(station.city);
+        });
     });
 
     // We need at least 2 stations to form a route
